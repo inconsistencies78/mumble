@@ -24,7 +24,7 @@ services:
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: ["CMD-SHELL", "bash -c '>/dev/tcp/localhost/64738' 2>/dev/null"]
+      test: ["CMD-SHELL", "ss -ltn | grep -q ':64738'"]
       interval: 30s
       timeout: 5s
       retries: 3
