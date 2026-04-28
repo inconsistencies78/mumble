@@ -186,20 +186,29 @@ abc12345.myfritz.net
 
 ### 4.3 Docker IPv6-Support aktivieren (einmalig auf dem Host)
 
+`daemon.json` liegt im Repo als `daemon.json` und muss nach `/etc/docker/` kopiert werden:
+
 ```bash
-# daemon.json einspielen (bereits unter /tmp/docker-daemon.json vorbereitet)
-sudo cp /tmp/docker-daemon.json /etc/docker/daemon.json
+# daemon.json einspielen
+sudo cp ~/docker/mumble/daemon.json /etc/docker/daemon.json
 
 # Docker-Daemon neu starten (alle Container stoppen kurz, starten automatisch neu)
 sudo systemctl restart docker
 
-# Mumble-Container mit IPv6-Netzwerk neu anlegen
-cd ~/docker/mumble && docker compose up -d
+# Mumble-Container mit IPv6-Netzwerk neu anlegen (--force-recreate nötig nach erstem Setup)
+cd ~/docker/mumble && docker compose up -d --force-recreate
 
-# Prüfen: beide Adressen lauschen?
-ss -ltn | grep 64738
-# Erwartete Ausgabe: je eine Zeile für 0.0.0.0:64738 und [::]:64738
+# Verifizieren
+docker compose ps
+# STATUS sollte "healthy" zeigen und Ports: 0.0.0.0:64738->64738, [::]:64738->64738
+docker inspect mumble --format '{{json .NetworkSettings.Ports}}'
+# Muss für tcp und udp je zwei Einträge zeigen: HostIp 0.0.0.0 und HostIp ::
 ```
+
+> **Hinweis `userland-proxy: false`:** Docker startet keinen `docker-proxy`-Prozess,
+> sondern setzt nftables-DNAT-Regeln. Direkt nach dem Daemon-Neustart kann `docker inspect`
+> kurz nur IPv4 zeigen — das ist ein transienter Zustand, der sich nach wenigen Sekunden
+> selbst auflöst. Bei anhaltenden Problemen: `docker compose up -d --force-recreate`.
 
 ### 4.4 Firewall-Check
 
