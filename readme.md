@@ -74,7 +74,7 @@ Server hinzufügen:
 
 | Feld | Wert |
 |---|---|
-| Adresse | `192.168.178.12` |
+| Adresse | `<HOST-IP>` |
 | Port | `64738` |
 | Benutzername | `SuperUser` |
 | Passwort | Inhalt von `secrets/MUMBLE_SUPERUSER_PASSWORD` |
@@ -139,7 +139,7 @@ Registrierung löschen: Rechtsklick → „Registrierung aufheben"
 
 **http://fritz.box → Internet → Freigaben → Portfreigaben**
 
-**„Gerät für Freigaben hinzufügen"** → `proxmox-ubuntu` (192.168.178.12) auswählen.
+**„Gerät für Freigaben hinzufügen"** → `<HOSTNAME>` (`<HOST-IP>`) auswählen.
 
 Dann **„Neue Freigabe"** → **„Portfreigabe"** (nicht „MyFRITZ!-Freigabe"):
 
@@ -204,7 +204,7 @@ Minimales PTT-Beispiel (GPIO-Button):
 import pymumble_py3 as pymumble
 
 mumble = pymumble.Mumble(
-    "192.168.178.12", "kind",
+    "<HOST-IP>", "kind",
     port=64738,
     password="SERVER_PASSWORT"
 )
