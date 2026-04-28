@@ -1,0 +1,13 @@
+# Passwörter und Secrets – niemals einchecken
+secrets/
+.env
+
+# Backups
+backups/
+
+# Claude Code intern
+.claude/
+
+# Laufzeit-Artefakte
+*.sqlite
+*.log

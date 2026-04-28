@@ -1,0 +1,47 @@
+services:
+  mumble:
+    image: mumblevoip/mumble-server:v1.4.230@sha256:42ea734f0a8962cde8c3cd5f0dc5536c9caf6131064093b9ba76ed133b104fc4
+    container_name: mumble
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:64738:64738/tcp"
+      - "0.0.0.0:64738:64738/udp"
+    volumes:
+      - mumble_data:/data
+    command: ["mumble-server", "-fg"]
+    secrets:
+      - MUMBLE_SUPERUSER_PASSWORD
+      - MUMBLE_CONFIG_serverpassword
+    environment:
+      TZ: Europe/Berlin
+      MUMBLE_CONFIG_users: "10"
+      MUMBLE_CONFIG_bandwidth: "32000"
+      MUMBLE_CONFIG_registerName: "Familien-Sprechanlage"
+      MUMBLE_CONFIG_allowhtml: "false"
+      MUMBLE_CONFIG_sendversion: "false"
+      MUMBLE_CONFIG_timeout: "30"
+      MUMBLE_CONFIG_welcometext: "Nur fuer Familie und Freunde. Zugang nur mit Einladung."
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '>/dev/tcp/localhost/64738' 2>/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+        reservations:
+          memory: 32M
+
+secrets:
+  MUMBLE_SUPERUSER_PASSWORD:
+    file: ./secrets/MUMBLE_SUPERUSER_PASSWORD
+  MUMBLE_CONFIG_serverpassword:
+    file: ./secrets/MUMBLE_CONFIG_serverpassword
+
+volumes:
+  mumble_data:
