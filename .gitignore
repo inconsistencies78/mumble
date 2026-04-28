@@ -11,3 +11,7 @@ backups/
 # Laufzeit-Artefakte
 *.sqlite
 *.log
+
+# DuckDNS (Token + Log)
+duckdns/
+duckdns/*.log

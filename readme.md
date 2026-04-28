@@ -128,7 +128,7 @@ Registrierung löschen: Rechtsklick → „Registrierung aufheben"
 
 ---
 
-## 4. Externe Erreichbarkeit über FritzBox + MyFRITZ! (DS-Lite / IPv6)
+## 4. Externe Erreichbarkeit über DuckDNS + FritzBox (DS-Lite / IPv6)
 
 > ⚠️ Mit dieser Konfiguration ist Port 64738 direkt aus dem Internet erreichbar.
 > Mumble verschlüsselt alle Inhalte (DTLS/SRTP). Schutz erfolgt durch starkes
@@ -136,19 +136,48 @@ Registrierung löschen: Rechtsklick → „Registrierung aufheben"
 > nur Port 64738 ist weitergeleitet.
 
 > **DS-Lite-Hinweis:** Bei DS-Lite gibt es keine öffentliche IPv4-Adresse.
-> Externe Clients verbinden sich ausschließlich über IPv6 (MyFRITZ! DynDNS löst
-> auf die IPv6-Adresse des Hosts auf). IPv4-Portfreigaben in der FritzBox
-> sind wirkungslos – stattdessen wird eine IPv6-Firewall-Freigabe benötigt.
+> Externe Clients verbinden sich ausschließlich über IPv6. Die IPv6 des Hosts
+> wird per DuckDNS-Skript alle 5 Minuten aktualisiert. IPv4-Portfreigaben in
+> der FritzBox sind wirkungslos – stattdessen wird eine IPv6-Firewall-Freigabe
+> benötigt.
 
-### 4.1 IPv6-Firewall-Freigabe in der FritzBox (FritzBox 6660 Cable)
+### 4.1 DuckDNS Dynamic DNS (automatisch)
+
+**Mumble-Adresse:** `m3mumble.duckdns.org`  
+**Skript:** `~/docker/mumble/duckdns/update.sh`  
+**Cron:** alle 5 Minuten, Log → `~/docker/mumble/duckdns/duckdns.log`
+
+Das Skript ermittelt die globale IPv6-Adresse des Interface `ens18` (Präfix `2a02:`)
+und ruft die DuckDNS-API auf. Das `duckdns/`-Verzeichnis ist in `.gitignore` –
+Token und Log werden nicht eingecheckt.
+
+**Einmalig einrichten (nach Neuinstallation):**
+
+```bash
+# Ausführbar machen
+chmod +x ~/docker/mumble/duckdns/update.sh
+
+# Cron-Job eintragen
+(crontab -l 2>/dev/null; echo "*/5 * * * * /home/andreas/docker/mumble/duckdns/update.sh >> /home/andreas/docker/mumble/duckdns/duckdns.log 2>&1") | crontab -
+
+# Einmalig manuell ausführen
+~/docker/mumble/duckdns/update.sh
+cat ~/docker/mumble/duckdns/duckdns.log
+# Erwartete Ausgabe: ...IPv6=2a02:... response=OK
+
+# DNS-Auflösung prüfen
+dig AAAA m3mumble.duckdns.org +short
+```
+
+### 4.2 IPv6-Firewall-Freigabe in der FritzBox (FritzBox 6660 Cable)
 
 **http://fritz.box → Heimnetz → Netzwerk → (Gerät auswählen) → IPv6-Adressen**
 
-Dort die aktuelle IPv6-Adresse des Hosts (`<HOST-IP>`) notieren.
+Dort die aktuelle IPv6-Adresse des Hosts notieren.
 
 **http://fritz.box → Internet → Freigaben → Portfreigaben**
 
-**„Gerät für Freigaben hinzufügen"** → `<HOSTNAME>` (`<HOST-IP>`) auswählen.
+**„Gerät für Freigaben hinzufügen"** → Geekom A8 Max auswählen.
 
 Dann **„Neue Freigabe"** → **„Portfreigabe"**:
 
@@ -174,15 +203,6 @@ Ergebnis: 2 Einträge (TCP + UDP für IPv6).
 **Nicht anklicken:**
 - ❌ „Exposed Host" (IPv4 oder IPv6)
 - ❌ „Selbstständige Portfreigaben erlauben"
-
-### 4.2 MyFRITZ!-Adresse einrichten
-
-**http://fritz.box → Internet → MyFRITZ!-Konto**
-
-Nach Einrichtung erscheint die feste Adresse, z.B.:
-```
-abc12345.myfritz.net
-```
 
 ### 4.3 Docker IPv6-Support aktivieren (einmalig auf dem Host)
 
@@ -222,16 +242,46 @@ Hier darf **kein** Gerät eingetragen sein.
 
 ### 4.5 Externe Clients verbinden
 
-```
-Adresse: <deine-id>.myfritz.net
-Port:    64738
-```
+#### Desktop (Windows/macOS/Linux)
+
+Mumble herunterladen: https://www.mumble.info/downloads/
+
+Server hinzufügen:
+
+| Feld | Wert |
+|---|---|
+| Adresse | `m3mumble.duckdns.org` |
+| Port | `64738` |
+| Benutzername | Gewünschter Anzeigename |
+| Passwort | Inhalt von `secrets/MUMBLE_CONFIG_serverpassword` |
+
+#### Android: Mumla
+
+Mumla im Play Store installieren: **Mumla – Mumble client**
+
+Server hinzufügen (Plus-Symbol):
+
+| Feld | Wert |
+|---|---|
+| Label | Familien-Sprechanlage (frei wählbar) |
+| Address | `m3mumble.duckdns.org` |
+| Port | `64738` |
+| Username | Gewünschter Anzeigename |
+| Password | Inhalt von `secrets/MUMBLE_CONFIG_serverpassword` |
+
+Beim ersten Verbinden: SSL-Warnung → Zertifikat akzeptieren (selbstsigniert, normal).  
+Danach: **Selbst → Registrieren** — verknüpft den Namen dauerhaft mit dem Gerät
+und schaltet `@auth`-Rechte (Sprechen) frei.
+
+> **IPv6-Hinweis:** Über LTE/5G funktioniert die Verbindung direkt. Im Heimnetz
+> nur wenn der Router IPv6 unterstützt; alternativ `mumble.home` per Pi-hole
+> (siehe 4.6).
 
 ### 4.6 Pi-hole (optional: LAN-Zugriff via Hostname)
 
-Externe Clients nutzen MyFRITZ! DNS direkt — Pi-hole ist nicht beteiligt.
+Externe Clients nutzen DuckDNS direkt — Pi-hole ist nicht beteiligt.
 
-Falls interne Clients ebenfalls über den MyFRITZ!-Hostnamen verbinden wollen
+Falls interne Clients ebenfalls über `m3mumble.duckdns.org` verbinden wollen
 (statt direkt über die LAN-IP), und das IPv6-Hairpinning der FritzBox nicht
 funktioniert:
 
@@ -354,4 +404,4 @@ docker compose pull && docker compose up -d
 
 ---
 
-*Erstellt März 2026 · Geekom A8 Max + Docker + FritzBox MyFRITZ! · mumble.info*
+*Erstellt März 2026 · Geekom A8 Max + Docker + FritzBox + DuckDNS · mumble.info*
