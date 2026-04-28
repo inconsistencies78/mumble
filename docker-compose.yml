@@ -6,6 +6,10 @@ services:
     ports:
       - "0.0.0.0:64738:64738/tcp"
       - "0.0.0.0:64738:64738/udp"
+      - "[::]:64738:64738/tcp"
+      - "[::]:64738:64738/udp"
+    networks:
+      - mumble_net
     volumes:
       - mumble_data:/data
     command: ["mumble-server", "-fg"]
@@ -36,6 +40,14 @@ services:
           memory: 128M
         reservations:
           memory: 32M
+
+networks:
+  mumble_net:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: "172.30.0.0/24"
+        - subnet: "fd42:dead:beef::/64"
 
 secrets:
   MUMBLE_SUPERUSER_PASSWORD:

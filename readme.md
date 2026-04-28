@@ -128,20 +128,29 @@ Registrierung löschen: Rechtsklick → „Registrierung aufheben"
 
 ---
 
-## 4. Externe Erreichbarkeit über FritzBox + MyFRITZ!
+## 4. Externe Erreichbarkeit über FritzBox + MyFRITZ! (DS-Lite / IPv6)
 
 > ⚠️ Mit dieser Konfiguration ist Port 64738 direkt aus dem Internet erreichbar.
 > Mumble verschlüsselt alle Inhalte (DTLS/SRTP). Schutz erfolgt durch starkes
 > Serverpasswort + ACL. Das restliche Heimnetz bleibt vollständig isoliert –
 > nur Port 64738 ist weitergeleitet.
 
-### 4.1 Portweiterleitung in der FritzBox (FritzBox 6660 Cable)
+> **DS-Lite-Hinweis:** Bei DS-Lite gibt es keine öffentliche IPv4-Adresse.
+> Externe Clients verbinden sich ausschließlich über IPv6 (MyFRITZ! DynDNS löst
+> auf die IPv6-Adresse des Hosts auf). IPv4-Portfreigaben in der FritzBox
+> sind wirkungslos – stattdessen wird eine IPv6-Firewall-Freigabe benötigt.
+
+### 4.1 IPv6-Firewall-Freigabe in der FritzBox (FritzBox 6660 Cable)
+
+**http://fritz.box → Heimnetz → Netzwerk → (Gerät auswählen) → IPv6-Adressen**
+
+Dort die aktuelle IPv6-Adresse des Hosts (`<HOST-IP>`) notieren.
 
 **http://fritz.box → Internet → Freigaben → Portfreigaben**
 
 **„Gerät für Freigaben hinzufügen"** → `<HOSTNAME>` (`<HOST-IP>`) auswählen.
 
-Dann **„Neue Freigabe"** → **„Portfreigabe"** (nicht „MyFRITZ!-Freigabe"):
+Dann **„Neue Freigabe"** → **„Portfreigabe"**:
 
 Erste Regel (TCP):
 
@@ -152,11 +161,15 @@ Erste Regel (TCP):
 | Port an Gerät | 64738 |
 | bis Port | 64738 |
 | Port extern gewünscht | 64738 |
-| Internetzugriff | IPv4 und IPv6 |
+| Internetzugriff | **IPv6** (nicht IPv4 – DS-Lite!) |
 
 → OK, dann nochmal **„Neue Freigabe"** → identisch, aber Protokoll **UDP**.
 
-Ergebnis: 4 grüne Einträge (TCP+UDP je für IPv4 und IPv6 – automatisch, nicht löschen).
+Ergebnis: 2 Einträge (TCP + UDP für IPv6).
+
+> **Warum kein IPv4?** Bei DS-Lite teilen sich viele Haushalte eine IPv4-Adresse
+> über CGNAT – eingehende IPv4-Verbindungen von außen sind nicht möglich.
+> Nur IPv6 funktioniert für externe Erreichbarkeit.
 
 **Nicht anklicken:**
 - ❌ „Exposed Host" (IPv4 oder IPv6)
@@ -171,22 +184,55 @@ Nach Einrichtung erscheint die feste Adresse, z.B.:
 abc12345.myfritz.net
 ```
 
-### 4.3 Firewall-Check
+### 4.3 Docker IPv6-Support aktivieren (einmalig auf dem Host)
+
+```bash
+# daemon.json einspielen (bereits unter /tmp/docker-daemon.json vorbereitet)
+sudo cp /tmp/docker-daemon.json /etc/docker/daemon.json
+
+# Docker-Daemon neu starten (alle Container stoppen kurz, starten automatisch neu)
+sudo systemctl restart docker
+
+# Mumble-Container mit IPv6-Netzwerk neu anlegen
+cd ~/docker/mumble && docker compose up -d
+
+# Prüfen: beide Adressen lauschen?
+ss -ltn | grep 64738
+# Erwartete Ausgabe: je eine Zeile für 0.0.0.0:64738 und [::]:64738
+```
+
+### 4.4 Firewall-Check
 
 **http://fritz.box → Internet → Freigaben → Portfreigaben → Gerät bearbeiten**
 
-Ausschließlich die vier Mumble-Regeln (2× TCP, 2× UDP) sollten dort stehen.
+Die zwei Mumble-Regeln (TCP + UDP, jeweils IPv6) sollten dort stehen.
 
 **http://fritz.box → Internet → Freigaben → „Exposed Host"**
 
 Hier darf **kein** Gerät eingetragen sein.
 
-### 4.4 Externe Clients verbinden
+### 4.5 Externe Clients verbinden
 
 ```
-Adresse: abc12345.myfritz.net
+Adresse: <deine-id>.myfritz.net
 Port:    64738
 ```
+
+### 4.6 Pi-hole (optional: LAN-Zugriff via Hostname)
+
+Externe Clients nutzen MyFRITZ! DNS direkt — Pi-hole ist nicht beteiligt.
+
+Falls interne Clients ebenfalls über den MyFRITZ!-Hostnamen verbinden wollen
+(statt direkt über die LAN-IP), und das IPv6-Hairpinning der FritzBox nicht
+funktioniert:
+
+**http://pi.hole → Local DNS → DNS Records**
+
+| Domain | IP |
+|---|---|
+| `mumble.home` | IPv6-Adresse des Hosts (aus FritzBox-Netzwerkübersicht) |
+
+Dann können interne Clients `mumble.home:64738` nutzen.
 
 ---
 
@@ -295,6 +341,7 @@ docker compose pull && docker compose up -d
 - `command: ["mumble-server", "-fg"]` ist zwingend erforderlich – ohne `-fg` beendet sich der Prozess sofort mit Code 0
 - `config/mumble.ini` im Repo ist ein leeres Verzeichnis (Docker-Artefakt) – hat keinen Effekt, da im Compose-File nicht eingebunden
 - Bandwidth-Limit 32 kbit/s pro User ist bewusst niedrig (Upload-Schonung bei FritzBox-Anschluss); Mumble-Standard wäre 72 kbit/s
+- IPv6 erfordert `ip6tables: true` in `/etc/docker/daemon.json` und ein Netz mit `enable_ipv6: true` im Compose-File — ohne beides bindet Docker keinen `[::]`-Port
 
 ---
 
